@@ -18,7 +18,6 @@ import type {
 } from "./types";
 import { validateDecodedDimensions, validateImageFile } from "./validate";
 import {
-  losslessTargetNote,
   outputLargerNote,
   transparencyWarning,
 } from "./warnings";
@@ -247,8 +246,7 @@ export async function processDecodedImage(
   );
   const mimeType = FORMAT_MIME[settings.outputFormat];
   const warnings = [
-    transparencyWarning(source.hasAlpha, settings.outputFormat),
-    losslessTargetNote(settings.outputFormat),
+    transparencyWarning(source.hasAlpha, settings.outputFormat, source.format),
     dimensions.warning,
   ].filter((item): item is string => Boolean(item));
   const notes: string[] = [];
@@ -264,7 +262,13 @@ export async function processDecodedImage(
       if (blob.size <= 0) {
         throw new Error("The encoder returned an empty file.");
       }
-      if (settings.outputFormat !== "png" && blob.type && blob.type !== mimeType) {
+      if (
+        settings.outputFormat === "webp" &&
+        blob.type !== mimeType
+      ) {
+        throw new Error("This browser did not return a WebP image.");
+      }
+      if (settings.outputFormat === "jpeg" && blob.type && blob.type !== mimeType) {
         throw new Error(
           `This browser did not encode ${settings.outputFormat.toUpperCase()}. Choose JPEG or PNG instead.`,
         );
@@ -273,6 +277,11 @@ export async function processDecodedImage(
     } catch (error) {
       if (error instanceof DOMException && error.name === "AbortError") {
         throw error;
+      }
+      if (settings.outputFormat === "webp") {
+        throw new Error(
+          "WebP encoding failed in this browser. No result was created. Select PNG to preserve transparency, or JPEG to flatten transparent areas onto white, then try again.",
+        );
       }
       throw new Error(
         error instanceof Error
@@ -296,7 +305,7 @@ export async function processDecodedImage(
         metTarget = blob.size <= targetBytes;
         if (!metTarget) {
           notes.push(
-            `Could not reach ${settings.targetKb} KB with PNG. Lossless PNG cannot go below ${formatKb(blob.size)} at ${dimensions.width}×${dimensions.height}. Resize further or switch to JPEG or WebP.`,
+            `The PNG encode at ${dimensions.width}×${dimensions.height} produced ${formatKb(blob.size)} (the smallest size achieved in this attempt), above your ${settings.targetKb} KB target. PNG has no lossy quality slider; reduce dimensions or choose WebP when available. JPEG is another option, but it flattens transparent areas onto white.`,
           );
         }
       }
@@ -350,7 +359,15 @@ export async function processDecodedImage(
     releaseCanvas(canvas);
   }
 
-  const larger = outputLargerNote(source.bytes, blob.size);
+  if (targetBytes != null) {
+    metTarget = blob.size <= targetBytes;
+  }
+
+  const larger = outputLargerNote(
+    source.bytes,
+    blob.size,
+    settings.outputFormat,
+  );
   if (larger) {
     notes.push(larger);
   }
@@ -375,8 +392,11 @@ function formatKb(bytes: number): string {
   return `${(bytes / 1024).toFixed(bytes >= 10240 ? 0 : 1)} KB`;
 }
 
-export const defaultProcessSettings = (format: OutputFormat): ProcessSettings => ({
-  outputFormat: format === "png" ? "png" : format,
+export const defaultProcessSettings = (
+  format: OutputFormat,
+  webpSupported = false,
+): ProcessSettings => ({
+  outputFormat: format === "png" && webpSupported ? "webp" : format,
   mode: "targetKb",
   quality: 80,
   targetKb: 200,

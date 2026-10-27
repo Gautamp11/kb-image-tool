@@ -1,11 +1,18 @@
 "use client";
 
-import type { OutputFormat, ProcessSettings } from "@/lib/image/types";
+import type {
+  InputFormat,
+  OutputFormat,
+  ProcessSettings,
+} from "@/lib/image/types";
+import { pngFormatHint } from "@/lib/image/warnings";
 
 type SettingsPanelProps = {
   settings: ProcessSettings;
   formats: OutputFormat[];
+  inputFormat: InputFormat;
   hasAlpha: boolean;
+  webpSupported: boolean;
   busy: boolean;
   onChange: (next: ProcessSettings) => void;
   onProcess: () => void;
@@ -18,20 +25,26 @@ export function qualityControlEnabled(format: OutputFormat): boolean {
 export function SettingsPanel({
   settings,
   formats,
+  inputFormat,
   hasAlpha,
+  webpSupported,
   busy,
   onChange,
   onProcess,
 }: SettingsPanelProps) {
   const qualityEnabled = qualityControlEnabled(settings.outputFormat);
-  const jpegWarning = hasAlpha && settings.outputFormat === "jpeg";
+  const jpegWarning =
+    settings.outputFormat === "jpeg" && (hasAlpha || inputFormat === "png");
 
   return (
     <section
       aria-labelledby="settings-heading"
       className="rounded-3xl border border-[#e4d8c8] bg-[#fffaf3] p-5 shadow-[0_12px_40px_rgba(31,26,22,0.06)]"
     >
-      <h2 id="settings-heading" className="text-lg font-semibold tracking-tight">
+      <h2
+        id="settings-heading"
+        className="text-lg font-semibold tracking-tight"
+      >
         Output settings
       </h2>
       <p className="mt-1 text-sm text-[#5c534c]">
@@ -65,23 +78,33 @@ export function SettingsPanel({
                   })
                 }
               />
-              {format}
+              {format === "webp" ? "WebP" : format}
             </label>
           ))}
         </div>
       </fieldset>
 
       {jpegWarning ? (
-        <p className="mt-3 rounded-2xl bg-[#fde8d6] px-3 py-2 text-sm text-[#7a3410]" role="status">
-          JPEG cannot keep transparency. Transparent pixels will flatten onto
-          white.
+        <p
+          className="mt-3 rounded-2xl bg-[#fde8d6] px-3 py-2 text-sm text-[#7a3410]"
+          role="status"
+        >
+          {inputFormat === "png"
+            ? "PNG may contain transparent pixels. JPEG cannot preserve them; any transparent areas will be flattened onto white."
+            : "JPEG cannot keep transparency. Transparent pixels will be flattened onto white."}
         </p>
       ) : null}
 
-      {!qualityEnabled ? (
-        <p className="mt-3 rounded-2xl bg-[#eef4f1] px-3 py-2 text-sm text-[#1f6b56]" role="status">
-          PNG is lossless. Quality does not apply. A target size usually needs
-          resizing or a switch to JPEG or WebP.
+      {settings.outputFormat === "png" ? (
+        <p className="mt-3 text-sm text-[#5c534c]" role="status">
+          {pngFormatHint(settings.outputFormat)}
+        </p>
+      ) : null}
+
+      {!webpSupported ? (
+        <p className="mt-3 text-sm text-[#5c534c]" role="status">
+          WebP encoding is unavailable in this browser. PNG remains available
+          for transparency; JPEG flattens transparent areas onto white.
         </p>
       ) : null}
 
@@ -125,7 +148,10 @@ export function SettingsPanel({
         </div>
       ) : (
         <div className="mt-4">
-          <label htmlFor="quality" className="flex justify-between text-sm font-medium">
+          <label
+            htmlFor="quality"
+            className="flex justify-between text-sm font-medium"
+          >
             <span>Quality</span>
             <span>{settings.quality}</span>
           </label>
@@ -158,7 +184,13 @@ export function SettingsPanel({
                   resize: { ...settings.resize, mode },
                 })
               }
-              label={mode === "none" ? "None" : mode === "percent" ? "Percent" : "Size"}
+              label={
+                mode === "none"
+                  ? "None"
+                  : mode === "percent"
+                    ? "Percent"
+                    : "Size"
+              }
             />
           ))}
         </div>
@@ -178,7 +210,10 @@ export function SettingsPanel({
             onChange={(event) =>
               onChange({
                 ...settings,
-                resize: { ...settings.resize, percent: Number(event.target.value) },
+                resize: {
+                  ...settings.resize,
+                  percent: Number(event.target.value),
+                },
               })
             }
             className="mt-2 min-h-11 w-full rounded-2xl border border-[#e4d8c8] bg-white px-3"
@@ -203,7 +238,10 @@ export function SettingsPanel({
                     ...settings,
                     resize: {
                       ...settings.resize,
-                      width: event.target.value === "" ? null : Number(event.target.value),
+                      width:
+                        event.target.value === ""
+                          ? null
+                          : Number(event.target.value),
                     },
                   })
                 }
@@ -224,7 +262,10 @@ export function SettingsPanel({
                     ...settings,
                     resize: {
                       ...settings.resize,
-                      height: event.target.value === "" ? null : Number(event.target.value),
+                      height:
+                        event.target.value === ""
+                          ? null
+                          : Number(event.target.value),
                     },
                   })
                 }
@@ -239,7 +280,10 @@ export function SettingsPanel({
               onChange={(event) =>
                 onChange({
                   ...settings,
-                  resize: { ...settings.resize, keepAspect: event.target.checked },
+                  resize: {
+                    ...settings.resize,
+                    keepAspect: event.target.checked,
+                  },
                 })
               }
             />

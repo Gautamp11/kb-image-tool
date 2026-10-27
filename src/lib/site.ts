@@ -1,17 +1,60 @@
-const PLACEHOLDER_SITE_URL = "https://www.example.com";
+const LOCAL_SITE_URL = "http://localhost:3000";
 
-function trimTrailingSlash(value: string): string {
-  return value.replace(/\/+$/, "");
+function parseSiteOrigin(value: string): URL {
+  let url: URL;
+
+  try {
+    url = new URL(value);
+  } catch {
+    throw new Error(
+      "NEXT_PUBLIC_SITE_URL must be an absolute HTTP or HTTPS origin.",
+    );
+  }
+
+  const originAndPath = value.match(/^[a-z][a-z\d+.-]*:\/\/[^/?#]*(.*)$/i);
+  if (
+    (url.protocol !== "http:" && url.protocol !== "https:") ||
+    !url.hostname ||
+    url.username ||
+    url.password ||
+    !originAndPath ||
+    (originAndPath[1] !== "" && originAndPath[1] !== "/")
+  ) {
+    throw new Error(
+      "NEXT_PUBLIC_SITE_URL must be an HTTP or HTTPS origin with no path, query, or fragment.",
+    );
+  }
+
+  return url;
 }
 
-/**
- * Canonical site origin. Until a production domain is chosen, this stays on
- * the IANA documentation host example.com so crawlers are not pointed at a
- * fabricated brand domain.
- */
-export const SITE_URL = trimTrailingSlash(
-  process.env.NEXT_PUBLIC_SITE_URL || PLACEHOLDER_SITE_URL,
+const isProduction = process.env.NODE_ENV === "production";
+const configuredSiteUrl = process.env.NEXT_PUBLIC_SITE_URL?.trim();
+
+if (isProduction && !configuredSiteUrl) {
+  throw new Error(
+    "NEXT_PUBLIC_SITE_URL is required for production and must be your public site origin.",
+  );
+}
+
+const siteUrl = parseSiteOrigin(configuredSiteUrl || LOCAL_SITE_URL);
+const hostname = siteUrl.hostname.toLowerCase().replace(/\.$/, "");
+const isPlaceholderDomain = ["example.com", "example.net", "example.org"].some(
+  (domain) => hostname === domain || hostname.endsWith(`.${domain}`),
 );
+const isLocalDomain =
+  hostname === "localhost" ||
+  hostname.endsWith(".localhost") ||
+  hostname.startsWith("127.") ||
+  hostname === "[::1]";
+
+if (isProduction && (isPlaceholderDomain || isLocalDomain)) {
+  throw new Error(
+    "NEXT_PUBLIC_SITE_URL must use a real public domain in production, not a placeholder or localhost.",
+  );
+}
+
+export const SITE_URL = siteUrl.origin;
 
 export const SITE_NAME = "FitKB";
 

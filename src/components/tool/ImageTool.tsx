@@ -2,7 +2,10 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { formatBytes, formatReductionLabel } from "@/lib/format";
-import { detectWebpEncodingSupport } from "@/lib/image/capabilities";
+import {
+  defaultOutputFormats,
+  detectWebpEncodingSupport,
+} from "@/lib/image/capabilities";
 import { closeBitmap, revokeObjectUrl } from "@/lib/image/objectUrl";
 import {
   defaultProcessSettings,
@@ -12,7 +15,6 @@ import {
 } from "@/lib/image/process";
 import type {
   DecodedImage,
-  OutputFormat,
   ProcessResult,
   ProcessSettings,
 } from "@/lib/image/types";
@@ -26,7 +28,8 @@ export function ImageTool() {
   const [source, setSource] = useState<DecodedImage | null>(null);
   const [result, setResult] = useState<ProcessResult | null>(null);
   const [settings, setSettings] = useState<ProcessSettings>(defaultProcessSettings("jpeg"));
-  const [formats, setFormats] = useState<OutputFormat[]>(["jpeg", "png"]);
+  const [webpSupported, setWebpSupported] = useState<boolean | null>(null);
+  const formats = defaultOutputFormats(webpSupported === true);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState<string | null>(null);
@@ -42,7 +45,7 @@ export function ImageTool() {
       if (!active) {
         return;
       }
-      setFormats(supported ? ["jpeg", "png", "webp"] : ["jpeg", "png"]);
+      setWebpSupported(supported);
     });
     return () => {
       active = false;
@@ -93,10 +96,11 @@ export function ImageTool() {
     setBusy(true);
     setProgress("Reading image…");
     try {
+      const supportsWebp =
+        webpSupported ?? (await detectWebpEncodingSupport());
+      setWebpSupported(supportsWebp);
       const decoded = await decodeImageFile(file);
-      const nextSettings = defaultProcessSettings(
-        formats.includes(decoded.format) ? decoded.format : "jpeg",
-      );
+      const nextSettings = defaultProcessSettings(decoded.format, supportsWebp);
       nextSettings.targetKb = Math.max(10, Math.round((decoded.bytes / 1024) * 0.5));
       nextSettings.resize.width = decoded.width;
       nextSettings.resize.height = decoded.height;
@@ -253,7 +257,9 @@ export function ImageTool() {
             <SettingsPanel
               settings={settings}
               formats={formats}
+              inputFormat={source.format}
               hasAlpha={source.hasAlpha}
+              webpSupported={webpSupported === true}
               busy={busy}
               onChange={setSettings}
               onProcess={runProcess}
@@ -275,14 +281,19 @@ function ResultBanner({
   result: ProcessResult;
   originalBytes: number;
 }) {
-  const success = result.metTarget;
+  const status =
+    result.targetBytes == null
+      ? "Encoded"
+      : result.metTarget
+        ? "Target met"
+        : "Target not met";
   return (
     <div
-      className={`rounded-2xl px-4 py-3 ${success ? "bg-[#eef4f1] text-[#1f6b56]" : "bg-[#fde8d6] text-[#7a3410]"}`}
+      className={`rounded-2xl px-4 py-3 ${result.targetBytes == null || result.metTarget ? "bg-[#eef4f1] text-[#1f6b56]" : "bg-[#fde8d6] text-[#7a3410]"}`}
       role="status"
     >
       <p className="font-medium">
-        {success ? "Target met" : "Target not met"} · {formatBytes(result.bytes)} ·{" "}
+        {status} · {formatBytes(result.bytes)} ·{" "}
         {result.width} × {result.height} · {formatReductionLabel(originalBytes, result.bytes)}
       </p>
       {result.qualityUsed != null ? (
