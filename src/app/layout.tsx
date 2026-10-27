@@ -18,7 +18,7 @@ export const metadata: Metadata = {
   ...defaultMetadata,
   verification: {
     ...defaultMetadata.verification,
-    google: "googlea0ded81c5063fa3b.html",
+    google: "WI3_MdlmORz2zlUL2olmNOrbRFojT0n5PZ0nBipLI-U",
   },
 };
 
