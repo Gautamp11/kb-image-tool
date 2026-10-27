@@ -69,6 +69,11 @@ export function SettingsPanel({
                 className="sr-only"
                 name="output-format"
                 value={format}
+                aria-label={
+                  format === "webp"
+                    ? "WebP recommended for smaller files"
+                    : format
+                }
                 checked={settings.outputFormat === format}
                 onChange={() =>
                   onChange({

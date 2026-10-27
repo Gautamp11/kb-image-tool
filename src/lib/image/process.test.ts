@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  decodeImageFile,
   defaultProcessSettings,
   processDecodedImage,
   suggestedDownloadName,
@@ -14,7 +15,57 @@ vi.mock("./objectUrl", () => ({
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  vi.restoreAllMocks();
 });
+
+function stubAlphaReadback(
+  width: number,
+  height: number,
+  transparentPixel?: { x: number; y: number },
+  failReadback = false,
+) {
+  let tileY = 0;
+  const context = {
+    clearRect: vi.fn(),
+    drawImage: vi.fn((_bitmap: ImageBitmap, ...args: number[]) => {
+      tileY = args[1] ?? 0;
+    }),
+    getImageData: vi.fn(
+      (_x: number, _y: number, tileWidth: number, tileHeight: number) => {
+        if (failReadback) {
+          throw new Error("Pixel readback unavailable.");
+        }
+        const data = new Uint8ClampedArray(tileWidth * tileHeight * 4);
+        for (let i = 3; i < data.length; i += 4) {
+          data[i] = 255;
+        }
+        if (
+          transparentPixel &&
+          transparentPixel.y >= tileY &&
+          transparentPixel.y < tileY + tileHeight
+        ) {
+          const pixelIndex =
+            ((transparentPixel.y - tileY) * tileWidth + transparentPixel.x) *
+            4;
+          data[pixelIndex + 3] = 0;
+        }
+        return { data } as ImageData;
+      },
+    ),
+  };
+  vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(
+    context as unknown as CanvasRenderingContext2D,
+  );
+  vi.stubGlobal(
+    "createImageBitmap",
+    vi.fn(async () => ({ width, height, close: vi.fn() })),
+  );
+  return context;
+}
+
+function pngFile() {
+  return new File(["image"], "photo.png", { type: "image/png" });
+}
 
 describe("suggestedDownloadName", () => {
   it("replaces the extension for the chosen output format", () => {
@@ -37,6 +88,33 @@ describe("defaultProcessSettings", () => {
 });
 
 describe("processDecodedImage", () => {
+  it("detects a single transparent pixel at full source resolution", async () => {
+    const context = stubAlphaReadback(128, 128, { x: 127, y: 127 });
+
+    const decoded = await decodeImageFile(pngFile());
+
+    expect(decoded.hasAlpha).toBe(true);
+    expect(context.getImageData).toHaveBeenCalledTimes(2);
+    expect(context.drawImage).toHaveBeenCalledTimes(2);
+  });
+
+  it("detects a fully opaque PNG without marking it transparent", async () => {
+    const context = stubAlphaReadback(128, 128);
+
+    const decoded = await decodeImageFile(pngFile());
+
+    expect(decoded.hasAlpha).toBe(false);
+    expect(context.getImageData).toHaveBeenCalledTimes(2);
+  });
+
+  it("assumes transparency when full-resolution alpha readback fails", async () => {
+    stubAlphaReadback(128, 128, undefined, true);
+
+    const decoded = await decodeImageFile(pngFile());
+
+    expect(decoded.hasAlpha).toBe(true);
+  });
+
   it("keeps the alpha-enabled canvas path for PNG-to-WebP output", async () => {
     const context = {
       clearRect: vi.fn(),

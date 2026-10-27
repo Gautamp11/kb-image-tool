@@ -47,24 +47,48 @@ async function createBitmap(file: File): Promise<ImageBitmap> {
   }
 }
 
-function sampleHasAlpha(bitmap: ImageBitmap): boolean {
-  const width = Math.min(64, bitmap.width);
-  const height = Math.min(64, bitmap.height);
+function hasTransparentPixels(bitmap: ImageBitmap): boolean {
+  const tileHeight = Math.min(64, bitmap.height);
   const canvas = document.createElement("canvas");
-  canvas.width = width;
-  canvas.height = height;
+  canvas.width = bitmap.width;
+  canvas.height = tileHeight;
   const ctx = canvas.getContext("2d", { willReadFrequently: true });
   if (!ctx) {
-    return false;
+    throw new Error("Could not inspect image transparency.");
   }
-  ctx.drawImage(bitmap, 0, 0, width, height);
-  const pixels = ctx.getImageData(0, 0, width, height).data;
-  for (let i = 3; i < pixels.length; i += 4) {
-    if (pixels[i] < 255) {
-      return true;
+
+  try {
+    for (let y = 0; y < bitmap.height; y += tileHeight) {
+      const currentTileHeight = Math.min(tileHeight, bitmap.height - y);
+      ctx.clearRect(0, 0, bitmap.width, tileHeight);
+      ctx.drawImage(
+        bitmap,
+        0,
+        y,
+        bitmap.width,
+        currentTileHeight,
+        0,
+        0,
+        bitmap.width,
+        currentTileHeight,
+      );
+      const pixels = ctx.getImageData(
+        0,
+        0,
+        bitmap.width,
+        currentTileHeight,
+      ).data;
+      for (let i = 3; i < pixels.length; i += 4) {
+        if (pixels[i] < 255) {
+          return true;
+        }
+      }
     }
+    return false;
+  } finally {
+    canvas.width = 0;
+    canvas.height = 0;
   }
-  return false;
 }
 
 export async function decodeImageFile(file: File): Promise<DecodedImage> {
@@ -97,10 +121,12 @@ export async function decodeImageFile(file: File): Promise<DecodedImage> {
   }
 
   let hasAlpha = validation.format !== "jpeg";
-  try {
-    hasAlpha = sampleHasAlpha(bitmap);
-  } catch {
-    hasAlpha = validation.format !== "jpeg";
+  if (hasAlpha) {
+    try {
+      hasAlpha = hasTransparentPixels(bitmap);
+    } catch {
+      hasAlpha = true;
+    }
   }
 
   return {

@@ -34,10 +34,6 @@ export function ImageTool() {
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
-  const sourceRef = useRef<DecodedImage | null>(null);
-  const resultRef = useRef<ProcessResult | null>(null);
-  sourceRef.current = source;
-  resultRef.current = result;
 
   useEffect(() => {
     let active = true;
@@ -54,27 +50,24 @@ export function ImageTool() {
 
   useEffect(() => {
     return () => {
+      if (source) {
+        revokeObjectUrl(source.objectUrl);
+        closeBitmap(source.bitmap);
+      }
+      if (result) {
+        revokeObjectUrl(result.objectUrl);
+      }
+    };
+  }, [source, result]);
+
+  useEffect(() => {
+    return () => {
       abortRef.current?.abort();
-      const currentSource = sourceRef.current;
-      if (currentSource) {
-        revokeObjectUrl(currentSource.objectUrl);
-        closeBitmap(currentSource.bitmap);
-      }
-      if (resultRef.current) {
-        revokeObjectUrl(resultRef.current.objectUrl);
-      }
     };
   }, []);
 
   function resetSource() {
     abortRef.current?.abort();
-    if (source) {
-      revokeObjectUrl(source.objectUrl);
-      closeBitmap(source.bitmap);
-    }
-    if (result) {
-      revokeObjectUrl(result.objectUrl);
-    }
     setSource(null);
     setResult(null);
     setError(null);
@@ -84,12 +77,7 @@ export function ImageTool() {
 
   async function handleFile(file: File) {
     abortRef.current?.abort();
-    if (source) {
-      revokeObjectUrl(source.objectUrl);
-      closeBitmap(source.bitmap);
-    }
     if (result) {
-      revokeObjectUrl(result.objectUrl);
       setResult(null);
     }
     setError(null);
@@ -136,9 +124,6 @@ export function ImageTool() {
         (update) => setProgress(update.message),
         controller.signal,
       );
-      if (result) {
-        revokeObjectUrl(result.objectUrl);
-      }
       setResult(next);
       if (!next.metTarget) {
         setError(null);
