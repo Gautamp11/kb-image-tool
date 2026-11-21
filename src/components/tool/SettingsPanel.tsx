@@ -14,8 +14,10 @@ type SettingsPanelProps = {
   hasAlpha: boolean;
   webpSupported: boolean;
   busy: boolean;
+  resultAvailable?: boolean;
   onChange: (next: ProcessSettings) => void;
   onProcess: () => void;
+  onDownload?: () => void;
 };
 
 export function qualityControlEnabled(format: OutputFormat): boolean {
@@ -29,8 +31,10 @@ export function SettingsPanel({
   hasAlpha,
   webpSupported,
   busy,
+  resultAvailable = false,
   onChange,
   onProcess,
+  onDownload,
 }: SettingsPanelProps) {
   const qualityEnabled = qualityControlEnabled(settings.outputFormat);
   const jpegWarning =
@@ -301,10 +305,19 @@ export function SettingsPanel({
         type="button"
         onClick={onProcess}
         disabled={busy}
-        className="mt-6 flex min-h-12 w-full items-center justify-center rounded-full bg-[#c45c26] px-5 text-base font-semibold text-[#fffaf3] disabled:cursor-not-allowed disabled:opacity-60"
+        className="mt-6 flex min-h-12 w-full cursor-pointer items-center justify-center rounded-full bg-[#c45c26] px-5 text-base font-semibold text-[#fffaf3] disabled:cursor-not-allowed disabled:opacity-60"
       >
         {busy ? "Working…" : "Compress image"}
       </button>
+      {resultAvailable && onDownload ? (
+        <button
+          type="button"
+          onClick={onDownload}
+          className="mt-3 flex min-h-12 w-full cursor-pointer items-center justify-center rounded-full bg-[#1f1a16] px-5 text-base font-semibold text-[#fffaf3]"
+        >
+          Download compressed image
+        </button>
+      ) : null}
     </section>
   );
 }
@@ -325,7 +338,7 @@ function ModeButton({
       type="button"
       disabled={disabled}
       onClick={onSelect}
-      className={`min-h-11 rounded-2xl border text-sm font-medium disabled:cursor-not-allowed disabled:opacity-40 ${
+      className={`min-h-11 cursor-pointer rounded-2xl border text-sm font-medium disabled:cursor-not-allowed disabled:opacity-40 ${
         selected
           ? "border-[#1f1a16] bg-[#1f1a16] text-[#fffaf3]"
           : "border-[#e4d8c8] bg-white"

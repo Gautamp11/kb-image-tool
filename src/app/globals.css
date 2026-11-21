@@ -39,6 +39,15 @@ body {
   color: var(--ink);
 }
 
+button:not(:disabled),
+summary {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+}
+
 :focus-visible {
   outline: 3px solid #c45c26;
   outline-offset: 3px;

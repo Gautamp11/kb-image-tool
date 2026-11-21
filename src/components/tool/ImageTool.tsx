@@ -177,26 +177,18 @@ export function ImageTool() {
 
       {source ? (
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1.4fr)_minmax(18rem,0.8fr)]">
-          <section className="space-y-4 rounded-3xl border border-[#e4d8c8] bg-[#fffaf3] p-5 shadow-[0_12px_40px_rgba(31,26,22,0.06)]">
+          <section
+            className="space-y-4 rounded-3xl border border-[#e4d8c8] bg-[#fffaf3] p-5 shadow-[0_12px_40px_rgba(31,26,22,0.06)]"
+          >
             <div className="flex flex-wrap items-center justify-between gap-3">
               <h2 className="text-lg font-semibold tracking-tight">Workspace</h2>
-              <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  className="min-h-11 rounded-full border border-[#e4d8c8] px-4 text-sm font-medium"
-                  onClick={resetSource}
-                >
-                  Change image
-                </button>
-                <button
-                  type="button"
-                  className="min-h-11 rounded-full bg-[#1f1a16] px-4 text-sm font-medium text-[#fffaf3] disabled:opacity-50"
-                  onClick={downloadResult}
-                  disabled={!result}
-                >
-                  Download
-                </button>
-              </div>
+              <button
+                type="button"
+                className="min-h-11 cursor-pointer rounded-full border border-[#e4d8c8] px-4 text-sm font-medium"
+                onClick={resetSource}
+              >
+                Change image
+              </button>
             </div>
 
             <StatList items={originalStats} />
@@ -246,8 +238,10 @@ export function ImageTool() {
               hasAlpha={source.hasAlpha}
               webpSupported={webpSupported === true}
               busy={busy}
+              resultAvailable={result !== null}
               onChange={setSettings}
               onProcess={runProcess}
+              onDownload={downloadResult}
             />
             <AdSlot placement="sidebar" label="Sidebar" />
           </div>
@@ -255,6 +249,7 @@ export function ImageTool() {
       ) : (
         <AdSlot placement="article" label="Below uploader" />
       )}
+
     </div>
   );
 }
